@@ -21,13 +21,16 @@ import torchvision.datasets as datasets
 import torchvision.models as models
 from torch.utils.data import Subset
 
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
+
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
                      and callable(models.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='PyTorch ImageNet Training')
-parser.add_argument('num_classes', default=200, help="the number of the classification tasks")
-parser.add_argument('data', metavar='DIR', default='tiny-imagenet',
+parser.add_argument('--num_classes', default=200, type=int, help="the number of the classification tasks")
+parser.add_argument('--data', metavar='DIR', default='./tiny-imagenet', type=str,
                     help='path to dataset (default: imagenet)')
 parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     choices=model_names,
@@ -146,6 +149,12 @@ def main_worker(gpu, ngpus_per_node, args):
     if args.arch == "resnet18":
         num_ftrs = model.fc.in_features
         model.fc = nn.Linear(num_ftrs, args.num_classes)
+        
+    # visualize the model with tensorboard
+    dummy_input = torch.rand(256, 3, 64, 64)
+    with SummaryWriter(comment='architecture of resnet18') as arc:
+        arc.add_graph(model, (dummy_input,))
+    exit(0)
     
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
