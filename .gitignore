@@ -1,1 +1,3 @@
 tiny-imagenet/
+val_images/
+demo.py
