@@ -39,7 +39,7 @@ parser.add_argument('-a', '--arch', metavar='ARCH', default='resnet18',
                     ' (default: resnet18)')
 parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                     help='number of data loading workers (default: 4)')
-parser.add_argument('--epochs', default=90, type=int, metavar='N',
+parser.add_argument('--epochs', default=25, type=int, metavar='N',
                     help='number of total epochs to run')
 parser.add_argument('--start-epoch', default=0, type=int, metavar='N',
                     help='manual epoch number (useful on restarts)')
@@ -73,7 +73,7 @@ parser.add_argument('--dist-backend', default='nccl', type=str,
                     help='distributed backend')
 parser.add_argument('--seed', default=None, type=int,
                     help='seed for initializing training. ')
-parser.add_argument('--gpu', default=None, type=int,
+parser.add_argument('--gpu', default=0, type=int,
                     help='GPU id to use.')
 parser.add_argument('--multiprocessing-distributed', action='store_true',
                     help='Use multi-processing distributed training to launch '
@@ -154,7 +154,6 @@ def main_worker(gpu, ngpus_per_node, args):
     dummy_input = torch.rand(256, 3, 64, 64)
     with SummaryWriter(comment='architecture of resnet18') as arc:
         arc.add_graph(model, (dummy_input,))
-    exit(0)
     
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -280,7 +279,9 @@ def main_worker(gpu, ngpus_per_node, args):
         train(train_loader, model, criterion, optimizer, epoch, args)
 
         # evaluate on validation set
-        acc1 = validate(val_loader, model, criterion, args)
+        acc1 = validate(val_loader, model, criterion, epoch, args)
+        
+        
 
         scheduler.step()
 
@@ -346,8 +347,12 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i + 1)
 
+    # update the train loss in tensorboard
+    writer.add_scalar('Loss/train', losses.avg, epoch)
+    writer.add_scalar('ACC@1/train', top1.avg.item(), epoch)
+    writer.add_scalar('ACC@5/train', top5.avg.item(), epoch)
 
-def validate(val_loader, model, criterion, args):
+def validate(val_loader, model, criterion, epoch, args):
 
     def run_validate(loader, base_progress=0):
         with torch.no_grad():
@@ -368,6 +373,7 @@ def validate(val_loader, model, criterion, args):
                 losses.update(loss.item(), images.size(0))
                 top1.update(acc1[0], images.size(0))
                 top5.update(acc5[0], images.size(0))
+                
 
                 # measure elapsed time
                 batch_time.update(time.time() - end)
@@ -403,6 +409,11 @@ def validate(val_loader, model, criterion, args):
         run_validate(aux_val_loader, len(val_loader))
 
     progress.display_summary()
+    
+    # update the validation loss in tensorboard
+    writer.add_scalar('Loss/val', losses.avg, epoch)
+    writer.add_scalar('ACC@1/val', top1.avg.item(), epoch)
+    writer.add_scalar('ACC@5/val', top5.avg.item(), epoch)    
 
     return top1.avg
 

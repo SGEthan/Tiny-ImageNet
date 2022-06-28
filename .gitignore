@@ -1,3 +1,5 @@
 tiny-imagenet/
 val_images/
 demo.py
+runs/
+.vscode/
