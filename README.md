@@ -84,4 +84,4 @@ Acc@1 36.490  Acc@5 62.690
 
 ## 致谢
 
-本实验代码基于 `pytorch` 开源仓库[样例](https://github.com/pytorch/examples/blob/main/imagenet/main.py)。
+本实验代码基于 `pytorch` 开源仓库[样例](https://github.com/pytorch/examples/blob/main/imagenet/main.py)。生成的改动说明在项目根目录下 `commit.patch`。
