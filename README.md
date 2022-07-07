@@ -66,7 +66,9 @@ tensorboard --logdir=runs
 
 ## 评判结果
 
-实验选取了两次 latest 和 best 的checkpoint，按照validation数据输入的顺序 `(shuffle=False, sampler=None)` 依次打印出了预测结果，呈现在仓库根目录下的txt文件中。同时，测试的最终结果如下:
+<img src="asserts/tar_file.png" style="zoom: 50%;" />
+
+实验选取了两次 latest 和 best 的checkpoint，按照 `validation` 数据输入的顺序 `(shuffle=False, sampler=None)` 依次打印出了预测结果，呈现在仓库根目录下的txt文件中。同时，测试的最终结果如下:
 
 ```python
 # last_checkpoint
@@ -79,3 +81,7 @@ Acc@1 36.490  Acc@5 62.690
 并且我们从测试结果中选取了第12张图片(0,18), 第70张图片(1, 58), 第134张图片(2, 178), 第208张图片(4, 19), 第568张图片(3, 10), 第756张图片(16, 198), 第884张图片(17, 30), 第7275张图片(164, 133), 第9086张图片(181, 188), 第9985张图片(152, 199), 这10张图片在两个模型中的评测结果不同，**括号内前一个为 best_model 的分类推断，后一个为 last_model 的分类推断**。
 
 <img src="asserts\result.png" style="zoom:40%;" />
+
+## 致谢
+
+本实验代码基于 `pytorch` 开源仓库[样例](https://github.com/pytorch/examples/blob/main/imagenet/main.py)。

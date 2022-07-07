@@ -4,4 +4,5 @@ demo.py
 runs/
 .vscode/
 result.pptx
-*.pth.tar
+checkpoint.pth.tar
+model_best.pth.tar
