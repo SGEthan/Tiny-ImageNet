@@ -20,9 +20,8 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import torchvision.models as models
 from torch.utils.data import Subset
-
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter()
+
 
 model_names = sorted(name for name in models.__dict__
                      if name.islower() and not name.startswith("__")
@@ -80,9 +79,14 @@ parser.add_argument('--multiprocessing-distributed', action='store_true',
                          'N processes per node, which has N GPUs. This is the '
                          'fastest way to use PyTorch for either single node or '
                          'multi node data parallel training')
+parser.add_argument('--tensorboard', action='store_true', help='to record the process with tensorboard')
+
 
 best_acc1 = 0
+writer = SummaryWriter()
 
+# print the test list to compare the different checkpoints
+pred_list = [] 
 
 def main():
     args = parser.parse_args()
@@ -118,6 +122,14 @@ def main():
     else:
         # Simply call main_worker function
         main_worker(args.gpu, ngpus_per_node, args)
+        
+    # whether to print the prediction result
+    if args.evaluate:
+        # print("The prediction result is:")
+        # print(pred_list)
+        pred_file = open(args.resume+"_pred_list.txt", "w")
+        for item in pred_list:
+            pred_file.write(str(item)+"\n")
 
 
 def main_worker(gpu, ngpus_per_node, args):
@@ -151,9 +163,10 @@ def main_worker(gpu, ngpus_per_node, args):
         model.fc = nn.Linear(num_ftrs, args.num_classes)
         
     # visualize the model with tensorboard
-    dummy_input = torch.rand(256, 3, 64, 64)
-    with SummaryWriter(comment='architecture of resnet18') as arc:
-        arc.add_graph(model, (dummy_input,))
+    if args.tensorboard:
+        dummy_input = torch.rand(256, 3, 64, 64)
+        with SummaryWriter(comment='architecture of resnet18') as arc:
+            arc.add_graph(model, (dummy_input,))
     
     if not torch.cuda.is_available():
         print('using CPU, this will be slow')
@@ -263,12 +276,16 @@ def main_worker(gpu, ngpus_per_node, args):
             train_sampler is None),
         num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
+    print(val_sampler)
     val_loader = torch.utils.data.DataLoader(
         val_dataset, batch_size=args.batch_size, shuffle=False,
         num_workers=args.workers, pin_memory=True, sampler=val_sampler)
 
+    self_args = args 
     if args.evaluate:
-        validate(val_loader, model, criterion, args)
+        print('into validating...')
+        print(self_args)
+        validate(val_loader, model, criterion, 0, self_args)
         return
 
     for epoch in range(args.start_epoch, args.epochs):
@@ -330,7 +347,7 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         loss = criterion(output, target)
 
         # measure accuracy and record loss
-        acc1, acc5 = accuracy(output, target, topk=(1, 5))
+        acc1, acc5 = accuracy(output, target, args, topk=(1, 5))
         losses.update(loss.item(), images.size(0))
         top1.update(acc1[0], images.size(0))
         top5.update(acc5[0], images.size(0))
@@ -347,12 +364,14 @@ def train(train_loader, model, criterion, optimizer, epoch, args):
         if i % args.print_freq == 0:
             progress.display(i + 1)
 
-    # update the train loss in tensorboard
-    writer.add_scalar('Loss/train', losses.avg, epoch)
-    writer.add_scalar('ACC@1/train', top1.avg.item(), epoch)
-    writer.add_scalar('ACC@5/train', top5.avg.item(), epoch)
+    if args.tensorboard:
+        # update the train loss in tensorboard
+        writer.add_scalar('Loss/train', losses.avg, epoch)
+        writer.add_scalar('ACC@1/train', top1.avg.item(), epoch)
+        writer.add_scalar('ACC@5/train', top5.avg.item(), epoch)
 
 def validate(val_loader, model, criterion, epoch, args):
+    print('Validating...')
 
     def run_validate(loader, base_progress=0):
         with torch.no_grad():
@@ -369,7 +388,7 @@ def validate(val_loader, model, criterion, epoch, args):
                 loss = criterion(output, target)
 
                 # measure accuracy and record loss
-                acc1, acc5 = accuracy(output, target, topk=(1, 5))
+                acc1, acc5 = accuracy(output, target, args, topk=(1, 5))
                 losses.update(loss.item(), images.size(0))
                 top1.update(acc1[0], images.size(0))
                 top5.update(acc5[0], images.size(0))
@@ -410,10 +429,11 @@ def validate(val_loader, model, criterion, epoch, args):
 
     progress.display_summary()
     
-    # update the validation loss in tensorboard
-    writer.add_scalar('Loss/val', losses.avg, epoch)
-    writer.add_scalar('ACC@1/val', top1.avg.item(), epoch)
-    writer.add_scalar('ACC@5/val', top5.avg.item(), epoch)    
+    if args.tensorboard:
+        # update the validation loss in tensorboard
+        writer.add_scalar('Loss/val', losses.avg, epoch)
+        writer.add_scalar('ACC@1/val', top1.avg.item(), epoch)
+        writer.add_scalar('ACC@5/val', top5.avg.item(), epoch)    
 
     return top1.avg
 
@@ -499,7 +519,7 @@ class ProgressMeter(object):
         fmt = '{:' + str(num_digits) + 'd}'
         return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
-def accuracy(output, target, topk=(1,)):
+def accuracy(output, target, args, topk=(1,)):
     """Computes the accuracy over the k top predictions for the specified values of k"""
     with torch.no_grad():
         maxk = max(topk)
@@ -508,7 +528,13 @@ def accuracy(output, target, topk=(1,)):
         _, pred = output.topk(maxk, 1, True, True)
         pred = pred.t()
         correct = pred.eq(target.view(1, -1).expand_as(pred))
-
+        
+        
+        # give out the prediction in an evaluate mode
+        if args.evaluate:
+            for item in pred[0]:
+                pred_list.append(item.item())
+                
         res = []
         for k in topk:
             correct_k = correct[:k].reshape(-1).float().sum(0, keepdim=True)
